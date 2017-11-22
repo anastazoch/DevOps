@@ -1,0 +1,25 @@
+apiVersion: v1beta1
+kind: Deployment
+metadata:
+  name: nginx-test-deployment
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        run: nginx-test
+    spec:
+      volumes:
+      - name: nginx-data
+        emptyDir: {}
+      containers:
+      - name: nginx-test
+        image: nginx:1.7.9
+        volumeMounts:
+        - mountPath: /nginx/html
+          name: nginx-data
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 443
+          name: https
