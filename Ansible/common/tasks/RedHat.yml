@@ -1,0 +1,68 @@
+---
+- name: perform system update
+  package: 
+    name: '*'
+    state: latest
+
+- name: reboot if kernel has been updated
+  shell: if [ $(rpm -q kernel|tail -n 1) != kernel-$(uname -r) ]; then echo 'reboot'; else echo 'no'; fi
+  ignore_errors: true
+  register: reboot_hint
+
+- name: perform a reboot
+  command: shutdown -r now "Reboot required for updated kernel"
+  async: 0
+  poll: 0
+  become: false
+  ignore_errors: true
+  when: reboot_hint.stdout.find("reboot") != -1
+  register: rebooting
+
+- name: Wait for thing to reboot...
+  pause: seconds=60
+  when: rebooting|changed
+
+- name: download epel repo rpm
+  get_url:
+    url: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm"
+    dest: "/root/epel-release-latest-{{ ansible_distribution_major_version}}.noarch.rpm"
+
+- name: install epel-release
+  package: name="/root/epel-release-latest-{{ ansible_distribution_major_version}}.noarch.rpm" state=present
+
+- name: install additional packages
+  package:
+    name={{ item }} state=present update_cache=yes
+  with_items:
+    - vim
+    - telnet
+    - net-tools
+    - bind-utils
+    - nmap
+    - bash-completion
+
+- name: install ntp
+  package: 
+    name: "{{ ntp_package }}" 
+    state: present
+    update_cache: yes
+  tags: ntp
+
+- name: use template file as ntp.conf
+  template: src=templates/ntp.conf.j2 dest=/etc/ntp.conf
+  notify: 
+    - restart ntpd
+  tags: ntp
+
+- name: glusterfs backup script
+  copy:
+    src: "{{ role_path }}/files/glusterfs-backup.sh"
+    dest: /root/glusterfs-backup.sh
+
+- name: backup glusterfs configuration
+  cron:
+    user: "root"
+    minute: "0"
+    hour: "22"
+    job: "/root/glusterfs-backup.sh"
+    state: present
