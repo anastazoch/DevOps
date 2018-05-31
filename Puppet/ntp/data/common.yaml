@@ -1,0 +1,5 @@
+---
+ntp::autoupdate: true
+ntp::package: chrony
+ntp::conf_file: chrony.conf
+ntp::service: chronyd
