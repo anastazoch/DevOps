@@ -1,0 +1,64 @@
+---
+- hosts: orbda
+  vars:
+
+  remote_user: root
+
+  tasks:
+  - name: creating HDFS mount points
+    file:
+      path: "/data{{ item }}"
+      state: directory
+      owner: root
+      group: root
+    with_sequence: start=1 end=16 stride=1
+
+  - name: creating HDFS partitions
+    parted:
+      device: "/dev/{{ item }}"
+      number: 1
+      state: present
+      part_start: 0%
+      part_end: 100%
+    with_items: ["sdb", "sdc", "sdd", "sde", "sdf", "sdg", "sdh", "sdi", "sdj", "sdk", "sdl", "sdm", "sdn", "sdo", "sdp", "sdq"]
+
+  - name: creating ext4 filesystems on the HDFS partitions
+    filesystem:
+      fstype: ext4
+      dev: "/dev/{{ item }}1"
+    with_items: ["sdb", "sdc", "sdd", "sde", "sdf", "sdg", "sdh", "sdi", "sdj", "sdk", "sdl", "sdm", "sdn", "sdo", "sdp", "sdq"]
+
+  - name: mounting HDFS partitions
+    mount:
+      fstab: /etc/fstab
+      path: "{{ item.mount_point }}"
+      src: "{{ item.partition }}"
+      fstype: ext4
+      opts: "defaults,noatime" 
+      state: present
+      dump: 0
+      passno: 0
+    with_items:
+      - { partition: /dev/sdb1, mount_point: /data1 }
+      - { partition: /dev/sdc1, mount_point: /data2 }
+      - { partition: /dev/sdd1, mount_point: /data3 }
+      - { partition: /dev/sde1, mount_point: /data4 }
+      - { partition: /dev/sdf1, mount_point: /data5 }
+      - { partition: /dev/sdg1, mount_point: /data6 }
+      - { partition: /dev/sdh1, mount_point: /data7 }
+      - { partition: /dev/sdi1, mount_point: /data8 }
+      - { partition: /dev/sdj1, mount_point: /data9 }
+      - { partition: /dev/sdk1, mount_point: /data10 }
+      - { partition: /dev/sdl1, mount_point: /data11 }
+      - { partition: /dev/sdm1, mount_point: /data12 }
+      - { partition: /dev/sdn1, mount_point: /data13 }
+      - { partition: /dev/sdo1, mount_point: /data14 }
+      - { partition: /dev/sdp1, mount_point: /data15 }
+      - { partition: /dev/sdq1, mount_point: /data16 }
+    notify: mounting filesystems
+
+  handlers:
+  - name: mounting filesystems
+    shell: mount -a
+ 
+    

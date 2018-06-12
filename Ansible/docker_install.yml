@@ -1,0 +1,70 @@
+---
+- hosts: devops
+  handlers:
+  - name: start and enable docker service
+    service:
+      name: docker
+      state: started
+      enabled: yes
+
+  tasks:
+  - name: uninstall old docker versions
+    package:
+      name: "{{ item }}"
+      state: absent
+    with_items:
+      - docker 
+      - docker-client 
+      - docker-client-latest 
+      - docker-common 
+      - docker-latest 
+      - docker-latest-logrotate 
+      - docker-logrotate 
+      - docker-selinux 
+      - docker-engine-selinux 
+      - docker-engine
+
+  - name: remove old docker data
+    file:
+      path: /var/lib/docker
+      state: absent
+
+  - name: perform yum update
+    package: 
+      name: '*'
+      state: latest
+
+  - name: perform yum clean all
+    command: yum clean all
+    args:
+      warn: no
+
+  - name: install auxiliary RPM packages
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - yum-utils 
+      - device-mapper-persistent-data 
+      - lvm2
+
+  - name: add docker stable repository
+    command: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+  - name: enable docker edge repository
+    command: yum-config-manager --enable docker-ce-edge
+
+  - name: enable docker test repository
+    command: yum-config-manager --enable docker-ce-test
+
+  - name: install docker-compose RPM package
+    package: 
+      name: docker-compose
+      state: present
+
+  - name: install docker ce
+    package: 
+      name: docker-ce
+      state: present
+    notify: start and enable docker service
+

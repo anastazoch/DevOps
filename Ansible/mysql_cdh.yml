@@ -1,0 +1,108 @@
+---
+- hosts: orbda-masters
+ 
+  become_user: root
+ 
+  vars:
+    mysql_login_user: root
+    mysql_new_temp_root_password: MyN3wP@$$
+    mysql_root_password: mysql
+    mysql_host: localhost
+
+  tasks:
+  - name: adding the MySQL Community repo
+    yum_repository:
+      name: mysql-community
+      file: mysql-community
+      description: MySQL Community
+      baseurl: http://10.124.161.38/repo/MySQL/mysql-5.7.20-community-centos7
+      enabled: yes
+      gpgcheck: no
+
+  - name: perform a full system update
+    package:
+      name: '*'
+      state: latest
+
+  - name: reboot if kernel has been updated
+    shell: if [ $(rpm -q kernel|tail -n 1) != kernel-$(uname -r) ]; then echo 'reboot'; else echo 'no'; fi
+    ignore_errors: true
+    register: reboot_hint
+
+  - name: perform a reboot
+    shell: sleep 2 && shutdown -r now "Reboot triggered by ansible"
+    async: 1
+    poll: 0
+    become: false
+    ignore_errors: True
+    when: reboot_hint.stdout.find('reboot') != -1
+    register: rebooting
+
+  - name: wait for the system to complete the reboot
+    wait_for_connection:
+      connect_timeout: 20
+      sleep: 5
+      delay: 5
+      timeout: 300
+    when: rebooting.changed
+
+  - name: installing the MySQL-python package
+    package: name=MySQL-python state=present
+
+  - name: installing mysql-server
+    package: name=mysql-server state=present
+
+  - name: starting and enabling the mysqld service
+    service: name=mysqld state=started enabled=yes
+
+  - name: get mysql root password
+    shell: grep 'temporary password' /var/log/mysqld.log | awk -F ' ' '{print $11}'
+    register: grep_mysql_temp_root_password
+
+#  - name: store mysql root password
+#    set_fact:
+#      mysql_temp_root_password: "{{ grep_mysql_temp_root_password.stdout }}"
+
+  - name: set new temporary root user password
+    mysql_user: 
+      name: root
+      host: "{{ mysql_host }}"
+      password: "{{ mysql_new_temp_root_password }}"
+      check_implicit_admin: yes
+      priv: '*.*:ALL,GRANT'
+      login_user: "{{ mysql_login_user }}"
+      login_password: "{{ grep_mysql_temp_root_password.stdout }}"
+      state: present
+
+#  - name: set new temporary root user password
+#    shell: >
+#      mysql -u root --password={{ grep_mysql_temp_root_password.stdout }}
+#      -e "ALTER USER root@localhost IDENTIFIED BY {{ mysql_new_temp_root_password }}"
+
+  - name: loosen mysql root password requirements
+    shell: >
+      mysql -u root --password={{ mysql_new_temp_root_password }} 
+      -e "uninstall plugin validate_password; ALTER USER root@localhost IDENTIFIED BY {{ mysql_root_password }}"
+
+  - name: stop the mysqld service
+    service: name=mysqld state=stopped
+
+  - name: move mysql_logfiles
+    shell: mv /var/lib/mysql/ib_logfile* /root
+
+  - name: create mysql_binary_log
+    file: path=/var/lib/mysql/mysql_binary_log state=touch owner=mysql group=mysql
+
+  - name: create MySQL configuration file
+    template:
+      src: my.cnf.j2
+      dest: /etc/my.cnf
+      backup: yes
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: start the mysqld service
+    service: name=mysqld state=started
+
+

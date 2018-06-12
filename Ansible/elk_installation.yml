@@ -1,0 +1,44 @@
+---
+- hosts: devops
+  vars:
+    
+  handlers:
+      
+  tasks:
+    - name: add Elasticsearch YUM repository
+      yum_repository:
+        name: elasticsearch-6.x
+        description: Elasticsearch repository for 6.x packages
+        file: elasticsearch6.x
+        baseurl: https://artifacts.elastic.co/packages/6.x/yum
+        enabled: yes
+        gpgcheck: yes
+        gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        # autorefresh: yes
+        # type: rpm-md
+        
+    - name: install prerequisites
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - java-1.8.0-openjdk-devel.x86_64
+
+    - name: install Elasticsearch RPM package
+      package:
+        name: elasticsearch
+        state: present
+
+    - name: reload systemd daemons
+      systemd:
+        daemon_reload: yes
+      notify: start and enable Elasticsearch service
+
+    - name: start and enable Elasticsearch service
+      systemd:
+        name: elasticsearch
+        state: started
+        enabled: yes
+
+    - name: install logstash
+      yum: name=https://artifacts.elastic.co/downloads/logstash/logstash-6.2.4.rpm state=present
