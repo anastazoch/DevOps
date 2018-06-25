@@ -1,5 +1,5 @@
 ---
-- hosts: orbda
+- hosts: hadoop_hosts
   vars:
 
   remote_user: root
