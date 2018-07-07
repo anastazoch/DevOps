@@ -1,0 +1,4 @@
+---
+- import_tasks: install-nrpe-v3.yml
+- import_tasks: install-nagios-plugins.yml
+- import_tasks: add-nrpe-scripts.yml

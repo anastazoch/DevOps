@@ -1,0 +1,76 @@
+---
+- name: installing the required RPM packages for NRPE
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items: ["gcc", "glibc", "glibc-common", "openssl", "openssl-devel", "perl", "wget"]
+
+- name: copying nagios sudoers file to the NRPE client
+  copy:
+    src: /etc/ansible/roles/nrpe/files/nagios-sudoers
+    dest: /etc/sudoers.d/nagios
+    mode: 0440
+    owner: root
+    group: root
+
+- name: copying nrpe-3.2.1.tar.gz to the NRPE client
+  copy:
+    src: /etc/ansible/roles/nrpe/files/nrpe-3.2.1.tar.gz
+    dest: /tmp
+
+- name: extracting /tmp/nrpe-3.2.1.tar.gz
+  unarchive:
+    src: /tmp/nrpe-3.2.1.tar.gz
+    dest: /tmp
+    remote_src: yes
+
+- name: building nrpe from source
+  command: "chdir=/tmp/nrpe-3.2.1 {{ item }}"
+  with_items:
+    - ./configure --enable-command-args
+    - make all
+
+- name: creating nagios user and groups
+  command: chdir=/tmp/nrpe-3.2.1 make install-groups-users
+
+- name: installing nrpe binaries
+  command: chdir=/tmp/nrpe-3.2.1 make install
+
+- name: installing nrpe configuration files
+  command: chdir=/tmp/nrpe-3.2.1 make install-config
+
+- name: updating nrpe services
+  blockinfile:
+    path: /etc/services
+    block: |
+
+      # Nagios services
+      nrpe    5666/tcp
+    insertafter: EOF
+
+- name: installing nrpe daemon
+  command: chdir=/tmp/nrpe-3.2.1 make install-init
+
+- name: opening firewall port for NRPE
+  firewalld:
+    port: 5666/tcp
+    permanent: true
+    state: enabled
+
+- name: updating /usr/local/nagios/etc/nrpe.cfg
+  replace:
+    path: /usr/local/nagios/etc/nrpe.cfg
+    regexp: "{{ item.regexp }}"
+    replace: "{{ item.replace }}"
+  with_items:
+    - {regexp: '^allowed_hosts=.*', replace: 'allowed_hosts=127.0.0.1,<nagios_server_ip_address>'}
+    - {regexp: '^dont_blame_nrpe=.*', replace: 'dont_blame_nrpe=1'}
+
+- name: starting and enabling the nrpe daemon
+  service:
+    name: nrpe
+    state: started
+    enabled: yes
+
+- name: testing NRPE
+  command: /usr/local/nagios/libexec/check_nrpe -H 127.0.0.1

@@ -1,0 +1,5 @@
+---
+- name: restarting nrpe daemon
+  service:
+    name: nrpe.service
+    state: restarted
