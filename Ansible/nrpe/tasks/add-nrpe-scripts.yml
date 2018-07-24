@@ -1,0 +1,23 @@
+---
+- name: copying nrpe scripts to the remote hosts
+  copy:
+    src: "/etc/ansible/roles/nrpe/files/{{ item }}"
+    dest: /usr/local/nagios/libexec
+    mode: 0755
+  with_items:
+    - script1
+    - script2
+    ...
+    - scriptN
+
+- name: adding commands to nrpe.config
+  lineinfile:
+    path: /usr/local/nagios/etc/nrpe.cfg
+    insertafter: '^command\[check_total_procs\]'
+    line: command[{{ item.command }}]=/usr/local/nagios/libexec/{{ item.script }}
+  with_items:
+    - {command: 'check_command1', script: 'check_script1'}
+    - {command: 'check_command2', script: 'check_script2'}
+    ...
+    - {command: 'check_commandN', script: 'check_scriptN'}
+  notify: restarting nrpe daemon

@@ -1,0 +1,35 @@
+---
+- name: installing the required RPM packages for Nagios plug-ins - 1
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items: ["gcc", "glibc", "glibc-common", "make", "gettext", "automake", "autoconf", "wget", "openssl-devel", "net-snmp", "net-snmp-utils"]
+
+- name: installing the required RPM packages for Nagios plug-ins - 2
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items: ["perl-Net-SNMP"]
+
+- name: copying nagios-plugins-release-2.2.1.tar.gz to client
+  copy:
+    src: /etc/ansible/roles/nrpe/files/nagios-plugins-release-2.2.1.tar.gz
+    dest: /tmp
+
+- name: extracting /tmp/nagios-plugins-release-2.2.1.tar.gz
+  unarchive:
+    src: /tmp/nagios-plugins-release-2.2.1.tar.gz
+    dest: /tmp
+    remote_src: yes
+
+- name: building and installing Nagios plug-ins
+  command: "chdir=/tmp/nagios-plugins-release-2.2.1 {{ item }}"
+  with_items:
+    - ./tools/setup
+    - ./configure
+    - make
+    - make install
+
+- name: testing NRPE check_load command
+  command: /usr/local/nagios/libexec/check_nrpe -H 127.0.0.1 -c check_load
+  ignore_errors: True
