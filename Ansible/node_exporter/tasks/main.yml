@@ -1,0 +1,36 @@
+---
+- name: copying the node_exporter gzipped tarball to the remote hosts
+  unarchive:
+    src: "{{ role_path }}/files/node_exporter-{{ version }}.linux-amd64.tar.gz"
+    dest: "{{ install_dir }}"
+#   extra_opts: "--strip-components=1"
+
+- name: creating a symlink to the node_exporter directory
+  file:
+    src: "{{ install_dir }}/node_exporter-{{ version }}.linux-amd64"
+    dest: "{{ install_dir }}/node_exporter"
+    owner: root
+    group: root
+    state: link
+
+- name: copying the node_exporter service file to the remote hosts
+  copy:
+    src: "{{ role_path }}/files/node_exporter.service"
+    dest: /etc/systemd/system
+
+- name: performing a reload of the Systemd daemons
+  systemd: daemon_reload=yes
+
+- name: starting and enabled the node_exporter service
+  service:
+    name: "{{ service }}"
+    state: started
+    enabled: yes
+
+- name: opening the node_exported port in the firewall
+  firewalld:
+    port: "{{ port }}"
+    permanent: true
+    state: enabled
+    immediate: yes
+  
