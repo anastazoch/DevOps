@@ -21,7 +21,7 @@
 - name: performing a reload of the Systemd daemons
   systemd: daemon_reload=yes
 
-- name: starting and enabled the node_exporter service
+- name: starting and enabling the node_exporter service
   service:
     name: "{{ service }}"
     state: started
